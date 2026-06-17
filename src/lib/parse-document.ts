@@ -31,7 +31,7 @@ async function extractPdfText(file: File): Promise<string> {
     const content = await page.getTextContent();
     out +=
       content.items
-        .map((it: { str?: string }) => ("str" in it && it.str ? it.str : ""))
+        .map((it) => ("str" in it && typeof it.str === "string" ? it.str : ""))
         .join(" ") + "\n\n";
   }
   return out.trim();
