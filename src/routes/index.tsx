@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useRef } from "react";
+import { useState, useRef, forwardRef } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { generateStudyPack, type StudyPack } from "@/lib/study-agent.functions";
 import { extractText } from "@/lib/parse-document";
@@ -242,72 +242,57 @@ function TabBtn({
   );
 }
 
-const UploadZone = (() => {
-  const Component = (
-    {
-      onFile,
-      loading,
-      filename,
-    }: {
-      onFile: (f: File) => void;
-      loading: boolean;
-      filename: string;
-    },
-    ref: React.Ref<HTMLInputElement>,
-  ) => {
-    const [drag, setDrag] = useState(false);
-    return (
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDrag(true);
-        }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDrag(false);
-          const f = e.dataTransfer.files?.[0];
-          if (f) onFile(f);
-        }}
-        className={`mt-10 max-w-2xl mx-auto card-soft p-10 border-2 border-dashed transition ${
-          drag ? "border-[var(--accent)] bg-[var(--surface)]" : "border-[var(--border)]"
-        }`}
-      >
-        {loading ? (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="animate-spin text-[var(--primary)]" size={32} />
-            <p className="font-medium">Reading {filename}…</p>
-            <p className="text-sm text-muted-foreground">
-              The agent is analysing your document and building your study pack.
-            </p>
+const UploadZone = forwardRef<
+  HTMLInputElement,
+  { onFile: (f: File) => void; loading: boolean; filename: string }
+>(function UploadZone({ onFile, loading, filename }, ref) {
+  const [drag, setDrag] = useState(false);
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDrag(true);
+      }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDrag(false);
+        const f = e.dataTransfer.files?.[0];
+        if (f) onFile(f);
+      }}
+      className={`mt-10 max-w-2xl mx-auto card-soft p-10 border-2 border-dashed transition ${
+        drag ? "border-[var(--accent)] bg-[var(--surface)]" : "border-[var(--border)]"
+      }`}
+    >
+      {loading ? (
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="animate-spin text-[var(--primary)]" size={32} />
+          <p className="font-medium">Reading {filename}…</p>
+          <p className="text-sm text-muted-foreground">
+            The agent is analysing your document and building your study pack.
+          </p>
+        </div>
+      ) : (
+        <label className="flex flex-col items-center gap-3 cursor-pointer">
+          <div className="w-14 h-14 rounded-full bg-[var(--primary)]/15 grid place-items-center">
+            <Upload className="text-[var(--primary)]" />
           </div>
-        ) : (
-          <label className="flex flex-col items-center gap-3 cursor-pointer">
-            <div className="w-14 h-14 rounded-full bg-[var(--primary)]/15 grid place-items-center">
-              <Upload className="text-[var(--primary)]" />
-            </div>
-            <p className="font-medium text-lg">Drop a document or click to upload</p>
-            <p className="text-sm text-muted-foreground">
-              PDF, DOCX, TXT or MD — up to ~60 pages
-            </p>
-            <input
-              ref={ref}
-              type="file"
-              accept=".pdf,.docx,.txt,.md,application/pdf,text/plain,text/markdown"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) onFile(f);
-              }}
-            />
-          </label>
-        )}
-      </div>
-    );
-  };
-  return Object.assign(
-    // eslint-disable-next-line react/display-name
-    (require("react") as typeof import("react")).forwardRef(Component),
-    {},
+          <p className="font-medium text-lg">Drop a document or click to upload</p>
+          <p className="text-sm text-muted-foreground">
+            PDF, DOCX, TXT or MD — up to ~60 pages
+          </p>
+          <input
+            ref={ref}
+            type="file"
+            accept=".pdf,.docx,.txt,.md,application/pdf,text/plain,text/markdown"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onFile(f);
+            }}
+          />
+        </label>
+      )}
+    </div>
   );
-})();
+});
