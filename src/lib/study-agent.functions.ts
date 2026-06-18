@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { generateText, Output } from "ai";
+import { generateText } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 
@@ -40,6 +40,18 @@ const InputSchema = z.object({
   filename: z.string().optional(),
 });
 
+function extractJson(raw: string): unknown {
+  let s = raw.trim();
+  // strip markdown fences
+  if (s.startsWith("```")) {
+    s = s.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  }
+  const first = s.indexOf("{");
+  const last = s.lastIndexOf("}");
+  if (first !== -1 && last !== -1) s = s.slice(first, last + 1);
+  return JSON.parse(s);
+}
+
 export const generateStudyPack = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => InputSchema.parse(data))
   .handler(async ({ data }) => {
@@ -48,25 +60,38 @@ export const generateStudyPack = createServerFn({ method: "POST" })
 
     const gateway = createLovableAiGatewayProvider(key);
 
-    const prompt = `You are an expert study-pack generator. From the document below, produce a study pack with:
-- a concise title
-- a 2-3 sentence summary
-- 5-8 key points
-- 8-12 flashcards (clear Q/A)
-- 6-10 multiple-choice questions (4 options each, with answerIndex 0-3 and a short explanation)
-- a mindmap: one root concept, 4-7 branches, each with 3-5 child concepts
-- 6-10 presentation slides with a title and 3-5 bullets each
+    const prompt = `You are an expert study-pack generator. From the document below, return ONLY valid minified JSON (no markdown, no commentary) matching exactly this TypeScript type:
+
+{
+  "title": string,
+  "summary": string,                                  // 2-3 sentences
+  "keyPoints": string[],                              // 5-8 items
+  "flashcards": { "q": string, "a": string }[],      // 8-12 items
+  "mcqs": {
+    "question": string,
+    "options": string[],                              // exactly 4
+    "answerIndex": number,                            // 0..3
+    "explanation": string
+  }[],                                                // 6-10 items
+  "mindmap": {
+    "root": string,
+    "branches": { "label": string, "children": string[] }[]  // 4-7 branches, each 3-5 children
+  },
+  "slides": { "title": string, "bullets": string[] }[]  // 6-10 slides, 3-5 bullets each
+}
 
 Document${data.filename ? ` (${data.filename})` : ""}:
 ---
 ${data.text}
----`;
+---
 
-    const { experimental_output } = await generateText({
-      model: gateway.chatModel("google/gemini-3-flash-preview"),
-      output: Output.object({ schema: StudyPackSchema }),
+Return the JSON object now.`;
+
+    const { text } = await generateText({
+      model: gateway("google/gemini-3-flash-preview"),
       prompt,
     });
 
-    return experimental_output as StudyPack;
+    const parsed = extractJson(text);
+    return StudyPackSchema.parse(parsed) as StudyPack;
   });
