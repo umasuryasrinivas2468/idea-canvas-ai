@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useRef, forwardRef } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { generateStudyPack, type StudyPack } from "@/lib/study-agent.functions";
+import { useState, useRef, forwardRef, useEffect } from "react";
+import { generateStudyPack, type StudyPack } from "@/lib/study-agent";
 import { extractText } from "@/lib/parse-document";
 import { downloadPptx } from "@/lib/export-pptx";
 import { Flashcards } from "@/components/study/Flashcards";
@@ -18,6 +17,8 @@ import {
   GitBranch,
   Loader2,
   RefreshCw,
+  Key,
+  ExternalLink,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -44,24 +45,51 @@ export const Route = createFileRoute("/")({
 
 type Tab = "summary" | "cards" | "quiz" | "mindmap" | "slides";
 
+const KEY_STORAGE = "studyforge.geminiKey";
+
 function Index() {
-  const generate = useServerFn(generateStudyPack);
   const [pack, setPack] = useState<StudyPack | null>(null);
   const [filename, setFilename] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("summary");
+  const [apiKey, setApiKey] = useState<string>("");
+  const [showKey, setShowKey] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(KEY_STORAGE);
+      if (saved) setApiKey(saved);
+    } catch {}
+  }, []);
+
+  function saveKey(v: string) {
+    setApiKey(v);
+    try {
+      if (v) localStorage.setItem(KEY_STORAGE, v);
+      else localStorage.removeItem(KEY_STORAGE);
+    } catch {}
+  }
 
   async function handleFile(file: File) {
     setError(null);
+    if (!apiKey) {
+      setError("Add your Google Gemini API key first (free at aistudio.google.com).");
+      setShowKey(true);
+      return;
+    }
     setLoading(true);
     setPack(null);
     setFilename(file.name);
     try {
       const text = await extractText(file);
       if (text.length < 50) throw new Error("Couldn't extract enough text from that file.");
-      const result = await generate({ data: { text: text.slice(0, 120000), filename: file.name } });
+      const result = await generateStudyPack({
+        text: text.slice(0, 120000),
+        filename: file.name,
+        apiKey,
+      });
       setPack(result);
       setTab("summary");
     } catch (e) {
@@ -77,6 +105,7 @@ function Index() {
     setFilename("");
     if (inputRef.current) inputRef.current.value = "";
   }
+
 
   return (
     <div className="min-h-screen hero-bg">
