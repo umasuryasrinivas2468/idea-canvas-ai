@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useRef, forwardRef, useEffect } from "react";
-import { generateStudyPack, type StudyPack } from "@/lib/study-agent";
+import { useState, useRef, forwardRef } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { generateStudyPack, type StudyPack } from "@/lib/study-agent.functions";
 import { extractText } from "@/lib/parse-document";
 import { downloadPptx } from "@/lib/export-pptx";
 import { Flashcards } from "@/components/study/Flashcards";
@@ -17,8 +18,6 @@ import {
   GitBranch,
   Loader2,
   RefreshCw,
-  Key,
-  ExternalLink,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -45,51 +44,24 @@ export const Route = createFileRoute("/")({
 
 type Tab = "summary" | "cards" | "quiz" | "mindmap" | "slides";
 
-const KEY_STORAGE = "studyforge.geminiKey";
-
 function Index() {
+  const generate = useServerFn(generateStudyPack);
   const [pack, setPack] = useState<StudyPack | null>(null);
   const [filename, setFilename] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("summary");
-  const [apiKey, setApiKey] = useState<string>("");
-  const [showKey, setShowKey] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(KEY_STORAGE);
-      if (saved) setApiKey(saved);
-    } catch {}
-  }, []);
-
-  function saveKey(v: string) {
-    setApiKey(v);
-    try {
-      if (v) localStorage.setItem(KEY_STORAGE, v);
-      else localStorage.removeItem(KEY_STORAGE);
-    } catch {}
-  }
 
   async function handleFile(file: File) {
     setError(null);
-    if (!apiKey) {
-      setError("Add your Google Gemini API key first (free at aistudio.google.com).");
-      setShowKey(true);
-      return;
-    }
     setLoading(true);
     setPack(null);
     setFilename(file.name);
     try {
       const text = await extractText(file);
       if (text.length < 50) throw new Error("Couldn't extract enough text from that file.");
-      const result = await generateStudyPack({
-        text: text.slice(0, 120000),
-        filename: file.name,
-        apiKey,
-      });
+      const result = await generate({ data: { text: text.slice(0, 120000), filename: file.name } });
       setPack(result);
       setTab("summary");
     } catch (e) {
@@ -105,7 +77,6 @@ function Index() {
     setFilename("");
     if (inputRef.current) inputRef.current.value = "";
   }
-
 
   return (
     <div className="min-h-screen hero-bg">
@@ -140,20 +111,12 @@ function Index() {
               mindmap, and a downloadable slide deck — in one click.
             </p>
 
-            <ApiKeyBar
-              apiKey={apiKey}
-              onChange={saveKey}
-              open={showKey}
-              setOpen={setShowKey}
-            />
-
             <UploadZone
               ref={inputRef}
               loading={loading}
               filename={filename}
               onFile={handleFile}
             />
-
 
             {error && (
               <p className="mt-4 text-sm text-red-300 bg-red-500/10 inline-block px-4 py-2 rounded-lg">
@@ -333,66 +296,3 @@ const UploadZone = forwardRef<
     </div>
   );
 });
-
-function ApiKeyBar({
-  apiKey,
-  onChange,
-  open,
-  setOpen,
-}: {
-  apiKey: string;
-  onChange: (v: string) => void;
-  open: boolean;
-  setOpen: (v: boolean) => void;
-}) {
-  const hasKey = apiKey.trim().length > 0;
-  return (
-    <div className="mt-8 max-w-2xl mx-auto">
-      {!open ? (
-        <button
-          onClick={() => setOpen(true)}
-          className="text-xs flex items-center gap-2 mx-auto px-3 py-1.5 rounded-full border border-[var(--border)] hover:bg-[var(--surface)] text-muted-foreground"
-        >
-          <Key size={12} />
-          {hasKey ? "Gemini API key saved — edit" : "Add your Gemini API key"}
-        </button>
-      ) : (
-        <div className="card-soft p-4 text-left">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-xs uppercase tracking-widest text-[var(--accent)] flex items-center gap-2">
-              <Key size={12} /> Google Gemini API key
-            </label>
-            <a
-              href="https://aistudio.google.com/app/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-muted-foreground hover:text-[var(--primary)] flex items-center gap-1"
-            >
-              Get a free key <ExternalLink size={11} />
-            </a>
-          </div>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="AIza..."
-            className="w-full px-3 py-2 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-sm font-mono outline-none focus:border-[var(--primary)]"
-          />
-          <p className="text-xs text-muted-foreground mt-2">
-            Stored only in your browser (localStorage). The key is sent directly from
-            your browser to Google — never to our servers.
-          </p>
-          <div className="flex justify-end mt-3">
-            <button
-              onClick={() => setOpen(false)}
-              className="text-xs px-3 py-1.5 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)]"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-

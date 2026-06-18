@@ -1,10 +1,9 @@
-// Browser-side study pack generator. Calls Google Gemini directly with a
-// user-supplied API key (BYOK). No server function — works on any static
-// host (Vercel, Netlify, GitHub Pages, etc).
-
+import { createServerFn } from "@tanstack/react-start";
+import { generateText } from "ai";
 import { z } from "zod";
+import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 
-export const StudyPackSchema = z.object({
+const StudyPackSchema = z.object({
   title: z.string(),
   summary: z.string(),
   keyPoints: z.array(z.string()),
@@ -36,8 +35,14 @@ export const StudyPackSchema = z.object({
 
 export type StudyPack = z.infer<typeof StudyPackSchema>;
 
+const InputSchema = z.object({
+  text: z.string().min(50).max(120000),
+  filename: z.string().optional(),
+});
+
 function extractJson(raw: string): unknown {
   let s = raw.trim();
+  // strip markdown fences
   if (s.startsWith("```")) {
     s = s.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   }
@@ -47,8 +52,15 @@ function extractJson(raw: string): unknown {
   return JSON.parse(s);
 }
 
-const PROMPT_TEMPLATE = (text: string, filename?: string) =>
-  `You are an expert study-pack generator. From the document below, return ONLY valid minified JSON (no markdown, no commentary) matching exactly this TypeScript type:
+export const generateStudyPack = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => InputSchema.parse(data))
+  .handler(async ({ data }) => {
+    const key = process.env.LOVABLE_API_KEY;
+    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+
+    const gateway = createLovableAiGatewayProvider(key);
+
+    const prompt = `You are an expert study-pack generator. From the document below, return ONLY valid minified JSON (no markdown, no commentary) matching exactly this TypeScript type:
 
 {
   "title": string,
@@ -68,48 +80,18 @@ const PROMPT_TEMPLATE = (text: string, filename?: string) =>
   "slides": { "title": string, "bullets": string[] }[]  // 6-10 slides, 3-5 bullets each
 }
 
-Document${filename ? ` (${filename})` : ""}:
+Document${data.filename ? ` (${data.filename})` : ""}:
 ---
-${text}
+${data.text}
 ---
 
 Return the JSON object now.`;
 
-export async function generateStudyPack(opts: {
-  text: string;
-  filename?: string;
-  apiKey: string;
-  model?: string;
-}): Promise<StudyPack> {
-  const model = opts.model || "gemini-2.0-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(opts.apiKey)}`;
+    const { text } = await generateText({
+      model: gateway("google/gemini-3-flash-preview"),
+      prompt,
+    });
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: PROMPT_TEMPLATE(opts.text, opts.filename) }] }],
-      generationConfig: {
-        temperature: 0.4,
-        responseMimeType: "application/json",
-      },
-    }),
+    const parsed = extractJson(text);
+    return StudyPackSchema.parse(parsed) as StudyPack;
   });
-
-  if (!res.ok) {
-    let msg = `Gemini API error (${res.status})`;
-    try {
-      const j = await res.json();
-      msg = j?.error?.message || msg;
-    } catch {}
-    throw new Error(msg);
-  }
-
-  const json = await res.json();
-  const text: string =
-    json?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
-  if (!text) throw new Error("Empty response from Gemini");
-
-  const parsed = extractJson(text);
-  return StudyPackSchema.parse(parsed);
-}

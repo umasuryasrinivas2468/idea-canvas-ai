@@ -1,4 +1,4 @@
-import type { StudyPack } from "@/lib/study-agent";
+import type { StudyPack } from "@/lib/study-agent.functions";
 
 export function Mindmap({ data }: { data: StudyPack["mindmap"] }) {
   const W = 1000;
