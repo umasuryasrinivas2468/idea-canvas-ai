@@ -140,12 +140,20 @@ function Index() {
               mindmap, and a downloadable slide deck — in one click.
             </p>
 
+            <ApiKeyBar
+              apiKey={apiKey}
+              onChange={saveKey}
+              open={showKey}
+              setOpen={setShowKey}
+            />
+
             <UploadZone
               ref={inputRef}
               loading={loading}
               filename={filename}
               onFile={handleFile}
             />
+
 
             {error && (
               <p className="mt-4 text-sm text-red-300 bg-red-500/10 inline-block px-4 py-2 rounded-lg">
