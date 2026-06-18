@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { StudyPack } from "@/lib/study-agent.functions";
+import type { StudyPack } from "@/lib/study-agent";
 
 export function Flashcards({ cards }: { cards: StudyPack["flashcards"] }) {
   const [idx, setIdx] = useState(0);

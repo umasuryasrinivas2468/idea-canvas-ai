@@ -1,4 +1,4 @@
-import type { StudyPack } from "./study-agent.functions";
+import type { StudyPack } from "./study-agent";
 
 export async function downloadPptx(pack: StudyPack) {
   const PptxGenJS = (await import("pptxgenjs")).default;
