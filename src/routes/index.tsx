@@ -333,3 +333,66 @@ const UploadZone = forwardRef<
     </div>
   );
 });
+
+function ApiKeyBar({
+  apiKey,
+  onChange,
+  open,
+  setOpen,
+}: {
+  apiKey: string;
+  onChange: (v: string) => void;
+  open: boolean;
+  setOpen: (v: boolean) => void;
+}) {
+  const hasKey = apiKey.trim().length > 0;
+  return (
+    <div className="mt-8 max-w-2xl mx-auto">
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="text-xs flex items-center gap-2 mx-auto px-3 py-1.5 rounded-full border border-[var(--border)] hover:bg-[var(--surface)] text-muted-foreground"
+        >
+          <Key size={12} />
+          {hasKey ? "Gemini API key saved — edit" : "Add your Gemini API key"}
+        </button>
+      ) : (
+        <div className="card-soft p-4 text-left">
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-xs uppercase tracking-widest text-[var(--accent)] flex items-center gap-2">
+              <Key size={12} /> Google Gemini API key
+            </label>
+            <a
+              href="https://aistudio.google.com/app/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground hover:text-[var(--primary)] flex items-center gap-1"
+            >
+              Get a free key <ExternalLink size={11} />
+            </a>
+          </div>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="AIza..."
+            className="w-full px-3 py-2 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-sm font-mono outline-none focus:border-[var(--primary)]"
+          />
+          <p className="text-xs text-muted-foreground mt-2">
+            Stored only in your browser (localStorage). The key is sent directly from
+            your browser to Google — never to our servers.
+          </p>
+          <div className="flex justify-end mt-3">
+            <button
+              onClick={() => setOpen(false)}
+              className="text-xs px-3 py-1.5 rounded-full bg-[var(--primary)] text-[var(--primary-foreground)]"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
